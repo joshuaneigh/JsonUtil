@@ -1,13 +1,26 @@
 import org.junit.jupiter.api.Test;
 import util.JsonUtil;
 
+import javax.json.JsonArray;
 import java.io.StringWriter;
+import java.io.Writer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+/**
+ * Drives the unit tests for the {@link JsonUtil} class. Intentionally outside the util package to test exposed
+ * {@link JsonUtil} API.
+ *
+ * @author NeighbargerJ
+ * @version 13 March 2019
+ */
 class JsonUtilTest {
 
+    /**
+     * An example Source JSON intended for use in testing the {@link JsonUtil#difference(String, String)},
+     * {@link JsonUtil#merge(String, String)}, and other similar methods.
+     */
     private static final String IDEAL_SOURCE_JSON =
             "{" +
                 "\"name\": {" +
@@ -29,6 +42,10 @@ class JsonUtilTest {
                 "]" +
             "}";
 
+    /**
+     * An example Target JSON intended for use in testing the {@link JsonUtil#difference(String, String)},
+     * {@link JsonUtil#merge(String, String)}, and other similar methods.
+     */
     private static final String IDEAL_TARGET_JSON =
             "{" +
                 "\"name\": {" +
@@ -51,6 +68,10 @@ class JsonUtilTest {
                 "]" +
             "}";
 
+    /**
+     * The expected result of {@link JsonUtil#merge(String, String)} when passing {@link #IDEAL_SOURCE_JSON} and
+     * {@link #IDEAL_TARGET_JSON}.
+     */
     private static final String IDEAL_MERGE_JSON =
             "\n" +
             "{\n" +
@@ -73,6 +94,10 @@ class JsonUtilTest {
             "    ]\n" +
             "}";
 
+    /**
+     * The expected result of {@link JsonUtil#difference(String, String)} when passing {@link #IDEAL_SOURCE_JSON} and
+     * {@link #IDEAL_TARGET_JSON}.
+     */
     private static final String IDEAL_DIFF_JSON =
             "\n" +
             "[\n" +
@@ -123,7 +148,10 @@ class JsonUtilTest {
             "    }\n" +
             "]";
 
-    private static final String IDEAL_SHAREPOINT_JSON =
+    /**
+     * An example Source JSON intended for use in testing the {@link JsonUtil#printToCsv(JsonArray, Writer)} method.
+     */
+    private static final String IDEAL_CSV_JSON =
             "\n" +
             "{\n" +
             "    \"d\": {\n" +
@@ -144,8 +172,8 @@ class JsonUtilTest {
             "            },\n" +
             "            {\n" +
             "                \"Title\": \"Person\",\n" +
-            "                \"PUBLISHED_x0020_INDICATOR\": \"Yes\",\n" +
-            "                \"VACANCY_x0020_NUMBER\": \"0\",\n" +
+            "                \"PUBLISHED_x0020_INDICATOR\": \"No\",\n" +
+            "                \"VACANCY_x0020_NUMBER\": \"1\",\n" +
             "                \"SENIOR_x0020_TYPE\": \"manager\",\n" +
             "                \"ORG\": \"TBG\",\n" +
             "                \"TIER\": \"3\",\n" +
@@ -160,16 +188,26 @@ class JsonUtilTest {
             "    }\n" +
             "}";
 
+    /**
+     * Tests the {@link JsonUtil#difference(String, String)} method under ideal conditions.
+     */
     @Test
     void differenceIdealTestCase() {
         assertEquals(IDEAL_DIFF_JSON, JsonUtil.difference(IDEAL_SOURCE_JSON, IDEAL_TARGET_JSON));
     }
 
+    /**
+     * Tests the {@link JsonUtil#merge(String, String)} method under ideal conditions.
+     */
     @Test
     void mergeIdealTestCase() {
         assertEquals(IDEAL_MERGE_JSON, JsonUtil.merge(IDEAL_SOURCE_JSON, IDEAL_TARGET_JSON));
     }
 
+    /**
+     * Tests the {@link JsonUtil#format(String)} method under ideal conditions, ensuring that its overloaded
+     * methods are returning identical data.
+     */
     @Test
     void formatOverloadedSimilarTestCase() {
         assertEquals(IDEAL_DIFF_JSON, JsonUtil.format(IDEAL_DIFF_JSON));
@@ -178,10 +216,13 @@ class JsonUtilTest {
         assertNotEquals(IDEAL_TARGET_JSON, JsonUtil.format(IDEAL_TARGET_JSON));
     }
 
+    /**
+     * Tests the {@link JsonUtil#printToCsv(JsonArray, Writer)} method under ideal conditions.
+     */
     @Test
-    void writeToCsvSharepointTestCase() {
-        System.out.println(
-                JsonUtil.writeToCsv(JsonUtil.toJson(IDEAL_SHAREPOINT_JSON).getJsonObject("d").getJsonArray("results"),
-                new StringWriter()));
+    void printToCsvSharePointTestCase() {
+        final StringWriter writer = new StringWriter();
+        JsonUtil.printToCsv(JsonUtil.toJson(IDEAL_CSV_JSON).getJsonObject("d").getJsonArray("results"), writer);
+        System.out.println(writer);
     }
 }

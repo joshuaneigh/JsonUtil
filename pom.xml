@@ -40,7 +40,7 @@
                 <configuration>
                     <forkCount>3</forkCount>
                     <reuseForks>true</reuseForks>
-                    <argLine>@{argLine} -Xmx1024m -XX:MaxPermSize=256m -Dmaven.test.failure.ignore=true</argLine>
+                    <argLine>@{argLine} -Xmx2048m -Dmaven.test.failure.ignore=true</argLine>
                 </configuration>
             </plugin>
             <plugin>
@@ -71,16 +71,7 @@
     </build>
 
     <dependencies>
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-api</artifactId>
-            <version>2.11.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-core</artifactId>
-            <version>2.11.1</version>
-        </dependency>
+        <!-- Testing Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
@@ -97,12 +88,10 @@
             <groupId>org.junit.platform</groupId>
             <artifactId>junit-platform-launcher</artifactId>
             <version>1.1.1</version>
+            <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.typesafe</groupId>
-            <artifactId>config</artifactId>
-            <version>1.3.2</version>
-        </dependency>
+
+        <!-- Source Dependencies -->
         <dependency>
             <groupId>javax.json</groupId>
             <artifactId>javax.json-api</artifactId>
