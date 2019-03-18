@@ -4,6 +4,7 @@ import com.opencsv.CSVWriter;
 
 import javax.json.*;
 import javax.json.stream.JsonGenerator;
+import javax.json.stream.JsonParsingException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -50,9 +51,10 @@ public final class JsonUtil {
      * @return the generated difference JSON as a {@link String}
      */
     public static String difference(final String theSource, final String theTarget) {
-        final JsonValue src = Json.createReader(new StringReader(theSource)).readValue();
-        final JsonValue tgt = Json.createReader(new StringReader(theTarget)).readValue();
-        return format(difference(src, tgt));
+        try (final JsonReader src = Json.createReader(new StringReader(theSource));
+             final JsonReader tgt = Json.createReader(new StringReader(theTarget))) {
+            return format(difference(src.readValue(), tgt.readValue()));
+        }
     }
 
     /**
@@ -75,9 +77,10 @@ public final class JsonUtil {
      * @return the generated difference JSON as a {@link String}
      */
     public static String merge(final String theSource, final String theTarget) {
-        final JsonValue src = Json.createReader(new StringReader(theSource)).readValue();
-        final JsonValue tgt = Json.createReader(new StringReader(theTarget)).readValue();
-        return format(merge(src, tgt));
+        try (final JsonReader src = Json.createReader(new StringReader(theSource));
+             final JsonReader tgt = Json.createReader(new StringReader(theTarget))) {
+            return format(merge(src.readValue(), tgt.readValue()));
+        }
     }
 
     /**
@@ -96,9 +99,12 @@ public final class JsonUtil {
      *
      * @param json the {@link String} Object to convert
      * @return the converted {@link JsonObject}
+     * @throws JsonParsingException if the passed JSON is malformed (i.e.: missing a comma or bracket)
      */
     public static JsonObject toJson(final String json) {
-        return Json.createReader(new StringReader(json)).readObject();
+        try (final JsonReader reader = Json.createReader(new StringReader(json))) {
+            return reader.readObject();
+        }
     }
 
     /**
@@ -110,7 +116,9 @@ public final class JsonUtil {
      * @return the formatted JSON {@link String}
      */
     public static String format(final String json) {
-        return format(Json.createReader(new StringReader(json)).readValue());
+        try (final JsonReader reader = Json.createReader(new StringReader(json))) {
+            return format(reader.readValue());
+        }
     }
 
     /**
@@ -123,19 +131,19 @@ public final class JsonUtil {
     public static String format(final JsonValue json) {
         final StringWriter stringWriter = new StringWriter();
         prettyPrint(json, stringWriter);
-        return stringWriter.toString();
+        /* For some reason, '\n' is prepended and not appended by the JsonWriter. Fix is in this return statement. */
+        return stringWriter.toString().substring(1) + '\n';
     }
 
     /**
-     * Takes a {@link JsonValue} Object and prints it to the passed {@link Writer}. Prints whitespace and prepends
-     * JSON with a '\n' character.
+     * Takes a {@link JsonValue} Object and prints it to the passed {@link Writer} with whitespace and newlines.
      *
      * @param json the {@link JsonValue} Object to print
      * @param writer the {@link Writer} destination of the printed JSON
      */
     private static void prettyPrint(final JsonValue json, final Writer writer) {
-        final Map<String, Object> config = Collections.singletonMap(JsonGenerator.PRETTY_PRINTING, true);
-        final JsonWriterFactory writerFactory = Json.createWriterFactory(config);
+        final JsonWriterFactory writerFactory =
+                Json.createWriterFactory(Collections.singletonMap(JsonGenerator.PRETTY_PRINTING, true));
         try (final JsonWriter jsonWriter = writerFactory.createWriter(writer)) {
             jsonWriter.write(json);
         }
@@ -155,6 +163,23 @@ public final class JsonUtil {
     }
 
     /**
+     * Writes the passed {@link JsonArray} in a CSV format. Contrary to the implementation of
+     * {@link #printToCsv(JsonArray, Writer)}, the key-set is defined from all keys within the Json as opposed to only
+     * the first key. This introduces further reliability and does not reduce flexibility, but it increases runtime and
+     * may still have inconsistent ordering of CSV columns. It is still recommended to write headers, but this method
+     * allows the client code to accept that risk because all of the data will exist within the Json.
+     *
+     * @param json the {@link JsonArray} Object to print
+     * @param writer the {@link Writer} destination of the printed JSON
+     * @param headers if headers should be written to the generated CSV
+     */
+    public static void printToCsvVerbose(final JsonArray json, final Writer writer, final boolean headers) {
+        final Set<String> sequence = new HashSet<>();
+        json.forEach(v -> sequence.addAll(v.asJsonObject().keySet()));
+        printToCsv(json, writer, sequence.toArray(new String[0]), headers);
+    }
+
+    /**
      * Writes the passed {@link JsonArray} in a CSV format. If a key within the passed sequence is not within the JSON
      * object, an empty string is written to the CSV. Keys that are present within the JSON that are not in the sequence
      * are ignored. If the sequence is null, it will be generated using the key set of the first entry and headers will
@@ -165,14 +190,14 @@ public final class JsonUtil {
      * @param sequence the order of the JSON keys within the CSV
      */
     public static void printToCsv(final JsonArray json, final Writer writer, final String[] sequence) {
-        printToCsv(json, writer, sequence, false);
+        printToCsv(json, writer, sequence, sequence == null);
     }
 
     /**
      * Writes the passed {@link JsonArray} in a CSV format. If a key within the passed sequence is not within the JSON
      * object, an empty string is written to the CSV. Keys that are present within the JSON that are not in the sequence
      * are ignored. If the sequence is null, it will be generated using the key set of the first entry;
-     * <b>this will override the writeHeaders parameter to true, otherwise the order of data is undefined.</b>
+     * <b>it is HIGHLY recommended to output headers when the sequence is null.</b>
      *
      * @param json the {@link JsonArray} Object to print
      * @param writer the {@link Writer} destination of the printed JSON
@@ -186,12 +211,8 @@ public final class JsonUtil {
         final CSVWriter csv;
 
         /* Supports option to pass a null sequence. */
-        if (sequence == null) {
-            keySequence = json.get(0).asJsonObject().keySet().toArray(new String[0]);
-            headers = true; /* If you want to accept the risk of not forcing headers while sequence is not defined */
-        } else {
-            keySequence = sequence.clone();
-        }
+        if (sequence == null) keySequence = json.get(0).asJsonObject().keySet().toArray(new String[0]);
+        else keySequence = sequence.clone();
 
         /* Write the header to the CSV. */
         csv = new CSVWriter(writer, ',', '"', '"', "\n");
@@ -202,8 +223,10 @@ public final class JsonUtil {
             final List<String> row = new ArrayList<>();
             final JsonObject object = entry.asJsonObject();
             for (final String key : keySequence) {
-                final String value = object.getString(key);
-                if (value != null && value.charAt(0) == '"') row.add(value.substring(1, value.length() - 1));
+                String value;
+                try {value = object.getString(key);}
+                catch (final NullPointerException e) {value = "";}
+                if (!value.isEmpty() && value.charAt(0) == '"') row.add(value.substring(1, value.length() - 1));
                 else row.add(value);
             }
             csv.writeNext(row.toArray(new String[0]));
